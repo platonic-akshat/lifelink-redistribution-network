@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: surplus-service
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/surplus/**
+        - id: need-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/needs/**
+        - id: coordination-matches
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/matches/**
+        - id: coordination-logistics
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/logistics/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Keep it simple: gateway-specific actuator endpoints
+        # (management.endpoint.gateway.enabled) aren't needed for the starter.
+        include: health,info
+
+# ---------------------------------------------------------------------------
+# DEV-ONLY DEFAULT. This secret is committed here purely so the gateway runs
+# out of the box on a laptop. In any real deployment this MUST be overridden
+# via an environment variable (SPRING_APPLICATION_JSON / LIFELINK_JWT_SECRET
+# mapped through Spring's relaxed binding, e.g. `LIFELINK_JWT_SECRET`) backed
+# by a real secret manager (Vault/AWS Secrets Manager/etc.) - never ship this
+# default to production.
+# ---------------------------------------------------------------------------
+lifelink:
+  jwt:
+    secret: "dev-only-insecure-signing-secret-do-not-use-in-production-change-me-1234567890"
+    expiry-seconds: 86400

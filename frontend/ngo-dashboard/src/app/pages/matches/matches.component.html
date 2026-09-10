@@ -1,0 +1,73 @@
+<div class="page">
+  <header class="page-header">
+    <h1>Proposed Matches</h1>
+    <div class="actions">
+      <a routerLink="/logistics">Logistics</a>
+      <button class="refresh" (click)="fetchPending()" [disabled]="isLoading">
+        {{ isLoading ? 'Refreshing…' : 'Refresh' }}
+      </button>
+    </div>
+  </header>
+
+  <p class="error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+  <p *ngIf="!isLoading && matches.length === 0" class="empty">
+    No pending matches right now.
+  </p>
+
+  <table class="matches-table" *ngIf="matches.length > 0">
+    <thead>
+      <tr>
+        <th>Need</th>
+        <th># Surplus Items</th>
+        <th>Score</th>
+        <th>Distance</th>
+        <th>Expires In</th>
+        <th>Proposed At</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <ng-container *ngFor="let match of matches">
+        <tr>
+          <td>{{ shortId(match.needId) }}</td>
+          <td>{{ match.surplusIds.length }}</td>
+          <td>{{ match.score | number: '1.2-2' }}</td>
+          <td>{{ match.distanceKm | number: '1.1-1' }} km</td>
+          <td [class.urgent]="match.hoursToExpiry < 2">{{ formatHours(match.hoursToExpiry) }}</td>
+          <td>{{ match.proposedAt | date: 'short' }}</td>
+          <td class="row-actions">
+            <button
+              class="approve"
+              (click)="approve(match)"
+              [disabled]="pendingActionMatchId === match.matchId"
+            >
+              Approve
+            </button>
+            <button
+              class="reject"
+              (click)="startReject(match)"
+              [disabled]="pendingActionMatchId === match.matchId"
+            >
+              Reject
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="rejectingMatchId === match.matchId" class="reject-row">
+          <td colspan="7">
+            <div class="reject-inline">
+              <input
+                type="text"
+                placeholder="Reason for rejection…"
+                [(ngModel)]="rejectReason"
+                name="rejectReason"
+              />
+              <button class="reject" (click)="confirmReject(match)">Confirm reject</button>
+              <button class="cancel" (click)="cancelReject()">Cancel</button>
+            </div>
+          </td>
+        </tr>
+      </ng-container>
+    </tbody>
+  </table>
+</div>
