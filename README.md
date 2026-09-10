@@ -56,7 +56,7 @@ mvn clean install
 ```bash
 cd backend/surplus-service       && mvn spring-boot:run   # :8081
 cd backend/need-service          && mvn spring-boot:run   # :8082
-cd backend/matching-service      && mvn spring-boot:run   # no HTTP port, Kafka Streams only
+cd backend/matching-service      && mvn spring-boot:run   # :8085 (actuator only, no REST API — pure Kafka Streams)
 cd backend/coordination-service  && mvn spring-boot:run   # :8083
 cd backend/notification-service  && mvn spring-boot:run   # :8084
 cd backend/api-gateway           && mvn spring-boot:run   # :8080  <- single entry point
@@ -77,9 +77,39 @@ Open Kafka-UI (http://localhost:8090) to watch `surplus.events`, `need.events`,
 `match.proposed`, `match.decisions`, and `logistics.events` populate in
 real time as you post surplus / needs and approve matches.
 
+### 5. Get a token and try the API
+
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"hospital1","password":"anything","role":"PROVIDER"}'
+# -> {"token": "..."}
+
+curl -X POST http://localhost:8080/api/surplus \
+  -H "Content-Type: application/json" -H "Authorization: Bearer <token>" \
+  -d '{"category":"BLOOD","subType":"O-negative","quantity":2,"unit":"units",
+       "latitude":19.076,"longitude":72.877,"expiresAt":"2026-09-15T00:00:00Z",
+       "providerId":"11111111-1111-1111-1111-111111111111","providerName":"City Hospital"}'
+```
+
+Post a matching need via `need-service` (through the gateway at `/api/needs`)
+in the same category/area and watch `match.proposed` appear in Kafka-UI within
+a few seconds — that's `matching-service`'s Kafka Streams topology finding it.
+
 ## Status
 
-This is a **starter repo** — architecture and core matching logic
-(surplus-service, need-service, matching-service) are fully wired; some
-supporting services and frontend screens are intentionally minimal scaffolds
-to build on. See each module's own README/TODOs for what's next.
+This is a **starter repo**, not a finished product. Every service and both
+frontends are implemented end-to-end and compile/build cleanly (`mvn install`
+across the whole `backend/` reactor, `npm run build` for both frontends), but
+several things are deliberately left for the next iteration rather than
+gold-plated here — see ARCHITECTURE.md for the reasoning behind each:
+
+- **Outbox pattern** — services publish to Kafka right after a DB commit, not
+  atomically with it (§7).
+- **PostGIS radius queries** — surplus/need-service use a geohash column +
+  in-memory haversine filter instead of `ST_DWithin` (§6).
+- **Real auth** — `api-gateway` issues a self-signed JWT for any non-blank
+  username/password; no user directory. Swap for Keycloak/Auth0 (§4.6, §8).
+- **Geohash neighbor fan-out** — matching-service joins within one geohash
+  cell (~5km); an item just across a cell boundary can be missed (§4.3, §9).
+- **Observability** — Prometheus/Grafana/tracing are documented, not wired.
