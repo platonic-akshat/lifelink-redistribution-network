@@ -24,6 +24,12 @@ public class MatchProposedConsumerConfig {
                 new JsonDeserializer<>(MatchProposedEvent.class, EventObjectMapper.create());
         deserializer.addTrustedPackages("com.lifelink.events.model");
         deserializer.setRemoveTypeHeaders(false);
+        // match.proposed is written by matching-service's Kafka Streams topology,
+        // which by default copies the __TypeId__ header over from whichever
+        // input record (NeedEvent or SurplusEvent) triggered the match. Ignoring
+        // type headers forces deserialization to always use the type given
+        // above instead of trusting that stale header.
+        deserializer.ignoreTypeHeaders();
         Map<String, Object> props = Map.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
                 ConsumerConfig.GROUP_ID_CONFIG, "notification-service",

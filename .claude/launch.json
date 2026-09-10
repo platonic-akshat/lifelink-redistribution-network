@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "surplus-portal",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd frontend/surplus-portal && npm run dev -- --port 5173"],
+      "port": 5173
+    },
+    {
+      "name": "ngo-dashboard",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd frontend/ngo-dashboard && npm start"],
+      "port": 4200
+    }
+  ]
+}
