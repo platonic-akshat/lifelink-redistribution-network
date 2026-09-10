@@ -30,11 +30,14 @@ infra/               docker-compose, Postgres init scripts, k8s manifests
 
 - Java 21, Maven 3.9+
 - Node 20+, npm
-- Docker + Docker Compose
+- Docker + Docker Compose **or** Homebrew (see below) — either works, no
+  admin/root privileges required for the Homebrew path
 
 ## Running locally
 
 ### 1. Start infra
+
+**With Docker:**
 
 ```bash
 docker compose up -d
@@ -43,6 +46,41 @@ docker compose up -d
 This brings up Kafka (localhost:9092), Kafka-UI (http://localhost:8090),
 Postgres (localhost:5432, databases `surplus_db`/`need_db`/`coordination_db`),
 and Redis (localhost:6379).
+
+**Without Docker (e.g. locked-down/work laptop with no Docker Desktop access)
+— plain Homebrew formulae, no privileged install step:**
+
+```bash
+brew install postgresql@16 kafka
+
+# Kafka (KRaft mode, single broker) - Homebrew's post-install already
+# formats the storage dir, so just start it:
+/opt/homebrew/opt/kafka/bin/kafka-server-start /opt/homebrew/etc/kafka/server.properties &
+
+# Postgres needs LC_ALL set on Apple Silicon or it fails to start:
+LC_ALL="en_US.UTF-8" /opt/homebrew/opt/postgresql@16/bin/postgres \
+  -D /opt/homebrew/var/postgresql@16 &
+
+# Create the app role + the three per-service databases:
+createuser -h localhost -U "$(whoami)" lifelink --createdb
+psql -h localhost -U "$(whoami)" -d postgres -c "ALTER ROLE lifelink WITH PASSWORD 'lifelink';"
+for db in surplus_db need_db coordination_db; do
+  createdb -h localhost -U "$(whoami)" -O lifelink "$db"
+done
+```
+
+Topics (`surplus.events`, `need.events`, `match.proposed`, `match.decisions`,
+`logistics.events`) don't need to be created manually — Kafka auto-creates
+them on first publish, **except** `matching-service` will crash on startup
+with `MissingSourceTopicException` if `surplus.events`/`need.events` don't
+exist yet (Kafka Streams needs its source topics to exist before it can
+build its physical plan). Start `surplus-service`/`need-service` first (or
+create the topics explicitly with `kafka-topics --create`), *then*
+`matching-service`.
+
+This repo skips Redis and PostGIS in the no-Docker path — neither is on the
+critical path for the demo (see ARCHITECTURE.md §6 and the Status section
+below).
 
 ### 2. Build the backend
 
@@ -113,3 +151,18 @@ gold-plated here — see ARCHITECTURE.md for the reasoning behind each:
 - **Geohash neighbor fan-out** — matching-service joins within one geohash
   cell (~5km); an item just across a cell boundary can be missed (§4.3, §9).
 - **Observability** — Prometheus/Grafana/tracing are documented, not wired.
+- **Surplus/need status sync on decision** — `match.decisions` is documented
+  as consumed by surplus-service/need-service (§5) to flip a claimed item to
+  `CLAIMED`/`MATCHED`, but that consumer isn't implemented yet; today only
+  coordination-service's own `MatchProposal`/`Logistics` records reflect the
+  decision. A real approval currently leaves the original surplus/need row
+  showing `POSTED` even after it's been matched and delivered.
+
+Verified end-to-end on 2026-09-10 by running the full stack (Kafka + Postgres
+via Homebrew, all 6 services, both frontends) and completing the whole happy
+path: post surplus → post need → Kafka Streams match found → approve →
+logistics SCHEDULED → PICKED_UP → DELIVERED. Three real bugs were caught and
+fixed in that pass: missing CORS support on the gateway, the JWT filter
+blocking CORS preflight on protected routes, and a Kafka Streams header
+propagation issue that made `match.proposed` messages fail deserialization
+in coordination-service/notification-service.
