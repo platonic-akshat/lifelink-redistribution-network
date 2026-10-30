@@ -13,8 +13,7 @@ Kafka topics, data model, deployment topology).
 
 - **Backend**: Java 21, Spring Boot 3, Spring Cloud Gateway, Kafka + Kafka
   Streams, Postgres + PostGIS, Flyway, Maven multi-module
-- **Frontend**: React + TypeScript + Vite (`surplus-portal` — provider **and** NGO/coordinator workflows), Angular
-  (`ngo-dashboard`, legacy duplicate of NGO flows; prefer React for new work)
+- **Frontend**: React + TypeScript + Vite (`surplus-portal` — provider, NGO, and coordinator workflows)
 - **Infra**: Docker Compose (Kafka KRaft, Postgres, Redis, Kafka-UI) for local
   dev; Kubernetes manifests sketch in `infra/k8s` for production
 
@@ -23,8 +22,7 @@ Kafka topics, data model, deployment topology).
 ```
 backend/            Maven multi-module: common-events + 6 Spring Boot services
 frontend/
-  surplus-portal/    React app — hospitals/donors post & track surplus
-  ngo-dashboard/      Angular app — NGOs review, approve matches, logistics
+  surplus-portal/    React app — unified web UI (providers, NGOs, coordinators)
 infra/               docker-compose, Postgres init scripts, k8s manifests
 ```
 
@@ -128,14 +126,13 @@ cd backend/notification-service  && mvn spring-boot:run   # :8084
 cd backend/api-gateway           && mvn spring-boot:run   # :8080  <- single entry point
 ```
 
-### 4. Run the frontends
+### 4. Run the frontend
 
 ```bash
 cd frontend/surplus-portal && npm install && npm run dev   # http://localhost:5173
-cd frontend/ngo-dashboard  && npm install && npm start     # http://localhost:4200 (optional; NGO flows also in React)
 ```
 
-Both frontends talk to the API through `api-gateway` on `http://localhost:8080`.
+The app talks to the API through `api-gateway` on `http://localhost:8080`.
 
 ## Watching the event flow
 
@@ -166,7 +163,7 @@ a few seconds — that's `matching-service`'s Kafka Streams topology finding it.
 
 This is a **starter repo**, not a finished product. Every service and both
 frontends are implemented end-to-end and compile/build cleanly (`mvn install`
-across the whole `backend/` reactor, `npm run build` for both frontends), but
+across the whole `backend/` reactor, `npm run build` for the React portal), but
 several things are deliberately left for the next iteration rather than
 gold-plated here — see ARCHITECTURE.md for the reasoning behind each:
 
@@ -190,7 +187,7 @@ gold-plated here — see ARCHITECTURE.md for the reasoning behind each:
   prevents duplicate PENDING rows for the same need/surplus pair.
 
 Verified end-to-end on 2026-09-10 by running the full stack (Kafka + Postgres
-via Homebrew, all 6 services, both frontends) and completing the whole happy
+via Homebrew, all 6 services, the React portal) and completing the whole happy
 path: post surplus → post need → Kafka Streams match found → approve →
 logistics SCHEDULED → PICKED_UP → DELIVERED. Three real bugs were caught and
 fixed in that pass: missing CORS support on the gateway, the JWT filter

@@ -29,14 +29,14 @@ before it expires or goes to waste.
 ## 3. High-Level Architecture
 
 ```
-                    ┌─────────────────┐        ┌──────────────────┐
-                    │  surplus-portal │        │   ngo-dashboard   │
-                    │   (React, TS)   │        │     (Angular)     │
-                    │ hospitals/donors│        │  NGOs/coordinators│
-                    └────────┬────────┘        └─────────┬─────────┘
-                             │  HTTPS/JSON                │ HTTPS/JSON
-                             └──────────────┬──────────────┘
-                                             │
+                    ┌─────────────────┐
+                    │  surplus-portal │
+                    │   (React, TS)   │
+                    │ providers, NGOs,│
+                    │   coordinators  │
+                    └────────┬────────┘
+                             │  HTTPS/JSON
+                             │
                                    ┌─────────▼─────────┐
                                    │    api-gateway     │  Spring Cloud Gateway
                                    │  (JWT auth, rate   │  routes + auth for all
@@ -109,7 +109,7 @@ before it expires or goes to waste.
 - Stateless, no DB (idempotency via Kafka consumer group offsets).
 
 ### 4.6 `api-gateway`
-- Single entry point for both frontends. Spring Cloud Gateway.
+- Single entry point for the React portal. Spring Cloud Gateway.
 - JWT validation (issued by an `auth` flow — starter repo uses a simple
   username/password + JWT issuer stub; production should delegate to
   Keycloak/Auth0).
@@ -199,8 +199,7 @@ lifelink-redistribution-network/
 │   ├── notification-service/
 │   └── api-gateway/
 ├── frontend/
-│   ├── surplus-portal/          (React + TS + Vite)
-│   └── ngo-dashboard/           (Angular)
+│   └── surplus-portal/          (React + TS + Vite)
 └── infra/
     └── k8s/                     (illustrative manifests)
 ```
