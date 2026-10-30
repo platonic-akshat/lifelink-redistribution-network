@@ -1,51 +1,90 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
-import { useAuth } from "./context/AuthContext";
+import { AuthProvider, homePathForRole, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AppShell from "./components/AppShell";
 import LoginPage from "./pages/LoginPage";
 import PostingsPage from "./pages/PostingsPage";
 import NewPostingPage from "./pages/NewPostingPage";
+import NeedsPage from "./pages/NeedsPage";
+import NewNeedPage from "./pages/NewNeedPage";
+import MatchesPage from "./pages/MatchesPage";
+import LogisticsPage from "./pages/LogisticsPage";
+import ExplorePage from "./pages/ExplorePage";
 
-function NavBar() {
-  const { isAuthenticated, logout } = useAuth();
+function HomeRedirect() {
+  const { role, isAuthenticated } = useAuth();
   if (!isAuthenticated) {
-    return null;
+    return <Navigate to="/login" replace />;
   }
-  return (
-    <nav className="navbar">
-      <span className="brand">LifeLink Surplus Portal</span>
-      <button className="link-button" onClick={logout}>
-        Log out
-      </button>
-    </nav>
-  );
+  return <Navigate to={homePathForRole(role)} replace />;
 }
 
 export default function App() {
   return (
-    <>
-      <NavBar />
+    <AuthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
-          path="/postings"
           element={
             <ProtectedRoute>
-              <PostingsPage />
+              <AppShell />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/postings/new"
-          element={
-            <ProtectedRoute>
-              <NewPostingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/postings" replace />} />
-        <Route path="*" element={<Navigate to="/postings" replace />} />
+        >
+          <Route path="/" element={<HomeRedirect />} />
+          <Route
+            path="/postings"
+            element={
+              <ProtectedRoute allowedRoles={["PROVIDER"]}>
+                <PostingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/postings/new"
+            element={
+              <ProtectedRoute allowedRoles={["PROVIDER"]}>
+                <NewPostingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/explore" element={<ExplorePage />} />
+          <Route
+            path="/needs"
+            element={
+              <ProtectedRoute allowedRoles={["NGO"]}>
+                <NeedsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/needs/new"
+            element={
+              <ProtectedRoute allowedRoles={["NGO"]}>
+                <NewNeedPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/matches"
+            element={
+              <ProtectedRoute allowedRoles={["COORDINATOR"]}>
+                <MatchesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/logistics"
+            element={
+              <ProtectedRoute allowedRoles={["COORDINATOR"]}>
+                <LogisticsPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </AuthProvider>
   );
 }

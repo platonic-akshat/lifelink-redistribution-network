@@ -1,0 +1,1 @@
+ALTER TABLE match_proposal ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

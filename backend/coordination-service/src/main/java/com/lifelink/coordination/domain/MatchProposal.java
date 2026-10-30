@@ -52,6 +52,10 @@ public class MatchProposal {
     @Column(name = "decided_at")
     private Instant decidedAt;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     protected MatchProposal() {
         // JPA
     }

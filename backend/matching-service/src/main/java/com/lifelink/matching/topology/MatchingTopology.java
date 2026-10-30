@@ -6,6 +6,7 @@ import com.lifelink.matching.serde.JacksonSerde;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.state.KeyValueStore;
@@ -17,10 +18,9 @@ import java.util.Optional;
 /**
  * Core matching logic. Two KTables ("what surplus/need is currently active
  * per category+geohash bucket") are joined against each other's incoming
- * stream, so a match can be triggered by *either* side changing first —
- * a need arriving after surplus already exists, or surplus arriving after
- * a need is already open. See ARCHITECTURE.md §4.3 for the full design
- * rationale, including the documented geohash-cell-boundary limitation.
+ * stream, so a match can be triggered by *either* side changing first.
+ * Each event is fanned out to neighboring geohash buckets so items near a
+ * cell boundary can still match.
  */
 @Configuration
 public class MatchingTopology {
@@ -36,11 +36,17 @@ public class MatchingTopology {
     public KStream<String, MatchProposedEvent> matchProposedStream(StreamsBuilder streamsBuilder) {
         KStream<String, SurplusEvent> surplusByBucket = streamsBuilder
                 .stream(KafkaTopics.SURPLUS_EVENTS, Consumed.with(STRING_SERDE, SURPLUS_EVENT_SERDE))
-                .selectKey((surplusId, event) -> bucketKey(event.category(), event.geohash5()));
+                .flatMap((surplusId, event) -> BucketFanout.bucketKeys(event.category(), event.location(), event.geohash5())
+                        .stream()
+                        .map(key -> KeyValue.pair(key, event))
+                        .toList());
 
         KStream<String, NeedEvent> needByBucket = streamsBuilder
                 .stream(KafkaTopics.NEED_EVENTS, Consumed.with(STRING_SERDE, NEED_EVENT_SERDE))
-                .selectKey((needId, event) -> bucketKey(event.category(), event.geohash5()));
+                .flatMap((needId, event) -> BucketFanout.bucketKeys(event.category(), event.location(), event.geohash5())
+                        .stream()
+                        .map(key -> KeyValue.pair(key, event))
+                        .toList());
 
         KTable<String, SurplusBucket> surplusTable = surplusByBucket
                 .groupByKey(Grouped.with(STRING_SERDE, SURPLUS_EVENT_SERDE))
@@ -83,9 +89,5 @@ public class MatchingTopology {
 
         merged.to(KafkaTopics.MATCH_PROPOSED, Produced.with(STRING_SERDE, MATCH_EVENT_SERDE));
         return merged;
-    }
-
-    private static String bucketKey(Category category, String geohash5) {
-        return category.name() + "|" + geohash5;
     }
 }

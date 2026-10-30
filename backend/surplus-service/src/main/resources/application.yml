@@ -17,6 +17,11 @@ spring:
     locations: classpath:db/migration
   kafka:
     bootstrap-servers: localhost:9092
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${LIFELINK_OAUTH2_ISSUER_URI:http://localhost:8180/realms/lifelink}
 
 management:
   endpoints:
@@ -24,8 +29,13 @@ management:
       exposure:
         include: health,info
 
-# Sweeps surplus postings nearing expiry so matching-service can prioritize
-# them. See SurplusExpirySweepJob.
 lifelink:
+  verification:
+    client-enabled: true
+    enforce: true
+  coordination:
+    base-url: http://localhost:8083
   surplus:
     expiring-soon-window-hours: 6
+  outbox:
+    relay-delay-ms: 1000

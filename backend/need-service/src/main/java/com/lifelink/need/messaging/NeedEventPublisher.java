@@ -4,7 +4,7 @@ import com.lifelink.events.geo.GeoPoint;
 import com.lifelink.events.model.NeedEvent;
 import com.lifelink.need.config.KafkaTopics;
 import com.lifelink.need.domain.Need;
-import org.springframework.kafka.core.KafkaTemplate;
+import com.lifelink.outbox.OutboxService;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -13,15 +13,16 @@ import java.util.UUID;
 @Component
 public class NeedEventPublisher {
 
-    private final KafkaTemplate<String, NeedEvent> kafkaTemplate;
+    private final OutboxService outboxService;
 
-    public NeedEventPublisher(KafkaTemplate<String, NeedEvent> kafkaTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
+    public NeedEventPublisher(OutboxService outboxService) {
+        this.outboxService = outboxService;
     }
 
     public void publish(Need need) {
+        UUID eventId = UUID.randomUUID();
         NeedEvent event = new NeedEvent(
-                UUID.randomUUID(),
+                eventId,
                 need.getId(),
                 need.getStatus(),
                 need.getCategory(),
@@ -34,6 +35,13 @@ public class NeedEventPublisher {
                 need.getRequesterId(),
                 Instant.now()
         );
-        kafkaTemplate.send(KafkaTopics.NEED_EVENTS, need.getId().toString(), event);
+        outboxService.enqueue(
+                KafkaTopics.NEED_EVENTS,
+                need.getId().toString(),
+                event,
+                eventId,
+                NeedEvent.class.getSimpleName(),
+                "Need",
+                need.getId());
     }
 }

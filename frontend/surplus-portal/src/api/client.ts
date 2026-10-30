@@ -2,7 +2,8 @@
 // (when present) on every request, and throws on non-2xx responses so
 // callers can rely on try/catch instead of checking `response.ok` everywhere.
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
+const BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8080";
 
 const AUTH_TOKEN_KEY = "lifelink.authToken";
 
@@ -74,7 +75,12 @@ export async function apiRequest<T>(
     try {
       const text = await response.text();
       if (text) {
-        message = text;
+        try {
+          const parsed = JSON.parse(text) as { error?: string; message?: string };
+          message = parsed.error ?? parsed.message ?? text;
+        } catch {
+          message = text;
+        }
       }
     } catch {
       // ignore body-read failures, fall back to the generic message

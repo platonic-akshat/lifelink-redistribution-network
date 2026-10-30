@@ -79,4 +79,45 @@ public class NeedService {
         eventPublisher.publish(need);
         return need;
     }
+
+    @Transactional
+    public void applyMatchApproved(UUID needId) {
+        Need need = getOrThrow(needId);
+        if (need.getStatus() == NeedStatus.MATCHED || need.getStatus() == NeedStatus.FULFILLED) {
+            return;
+        }
+        if (need.getStatus() != NeedStatus.POSTED) {
+            throw new IllegalStateException("Need " + needId + " is not open for matching");
+        }
+        need.setStatus(NeedStatus.MATCHED);
+        need.setUpdatedAt(Instant.now());
+        eventPublisher.publish(need);
+    }
+
+    @Transactional
+    public void applyLogisticsDelivered(UUID needId) {
+        Need need = getOrThrow(needId);
+        if (need.getStatus() == NeedStatus.FULFILLED) {
+            return;
+        }
+        if (need.getStatus() != NeedStatus.MATCHED) {
+            throw new IllegalStateException("Need " + needId + " must be matched before fulfillment");
+        }
+        need.setStatus(NeedStatus.FULFILLED);
+        need.setUpdatedAt(Instant.now());
+        eventPublisher.publish(need);
+    }
+
+    @Transactional
+    public void applyLogisticsFailed(UUID needId) {
+        Need need = getOrThrow(needId);
+        if (need.getStatus() == NeedStatus.POSTED) {
+            return;
+        }
+        if (need.getStatus() == NeedStatus.MATCHED) {
+            need.setStatus(NeedStatus.POSTED);
+            need.setUpdatedAt(Instant.now());
+            eventPublisher.publish(need);
+        }
+    }
 }

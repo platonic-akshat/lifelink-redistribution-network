@@ -27,6 +27,8 @@
 
   <modules>
     <module>common-events</module>
+    <module>common-security</module>
+    <module>common-outbox</module>
     <module>surplus-service</module>
     <module>need-service</module>
     <module>matching-service</module>
@@ -54,6 +56,16 @@
       <dependency>
         <groupId>com.lifelink</groupId>
         <artifactId>common-events</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.lifelink</groupId>
+        <artifactId>common-security</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.lifelink</groupId>
+        <artifactId>common-outbox</artifactId>
         <version>${project.version}</version>
       </dependency>
     </dependencies>

@@ -1,15 +1,18 @@
 package com.lifelink.coordination.service;
 
+import com.lifelink.coordination.domain.AllocatedSurplus;
 import com.lifelink.coordination.domain.Logistics;
 import com.lifelink.coordination.domain.MatchProposal;
 import com.lifelink.coordination.domain.MatchProposalStatus;
 import com.lifelink.coordination.messaging.LogisticsEventPublisher;
 import com.lifelink.coordination.messaging.MatchDecisionEventPublisher;
+import com.lifelink.coordination.repository.AllocatedSurplusRepository;
 import com.lifelink.coordination.repository.LogisticsRepository;
 import com.lifelink.coordination.repository.MatchProposalRepository;
 import com.lifelink.events.model.LogisticsStatus;
 import com.lifelink.events.model.MatchDecision;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,15 +25,18 @@ public class MatchService {
 
     private final MatchProposalRepository proposalRepository;
     private final LogisticsRepository logisticsRepository;
+    private final AllocatedSurplusRepository allocatedSurplusRepository;
     private final MatchDecisionEventPublisher decisionEventPublisher;
     private final LogisticsEventPublisher logisticsEventPublisher;
 
     public MatchService(MatchProposalRepository proposalRepository,
                          LogisticsRepository logisticsRepository,
+                         AllocatedSurplusRepository allocatedSurplusRepository,
                          MatchDecisionEventPublisher decisionEventPublisher,
                          LogisticsEventPublisher logisticsEventPublisher) {
         this.proposalRepository = proposalRepository;
         this.logisticsRepository = logisticsRepository;
+        this.allocatedSurplusRepository = allocatedSurplusRepository;
         this.decisionEventPublisher = decisionEventPublisher;
         this.logisticsEventPublisher = logisticsEventPublisher;
     }
@@ -47,6 +53,10 @@ public class MatchService {
     @Transactional
     public MatchProposal approve(UUID matchId, UUID decidedBy) {
         MatchProposal proposal = getOrThrow(matchId);
+        if (proposal.getStatus() != MatchProposalStatus.PENDING) {
+            throw new IllegalStateException("Match " + matchId + " is already " + proposal.getStatus());
+        }
+        reserveSurplusInventory(proposal);
         proposal.approve(decidedBy, Instant.now());
         decisionEventPublisher.publish(proposal, MatchDecision.APPROVED);
 
@@ -60,8 +70,22 @@ public class MatchService {
     @Transactional
     public MatchProposal reject(UUID matchId, UUID decidedBy, String reason) {
         MatchProposal proposal = getOrThrow(matchId);
+        if (proposal.getStatus() != MatchProposalStatus.PENDING) {
+            throw new IllegalStateException("Match " + matchId + " is already " + proposal.getStatus());
+        }
         proposal.reject(decidedBy, reason, Instant.now());
         decisionEventPublisher.publish(proposal, MatchDecision.REJECTED);
         return proposal;
+    }
+
+    private void reserveSurplusInventory(MatchProposal proposal) {
+        for (UUID surplusId : proposal.getSurplusIds()) {
+            try {
+                allocatedSurplusRepository.saveAndFlush(new AllocatedSurplus(surplusId, proposal.getMatchId()));
+            } catch (DataIntegrityViolationException ex) {
+                throw new IllegalStateException(
+                        "Surplus " + surplusId + " is already allocated to another approved match");
+            }
+        }
     }
 }

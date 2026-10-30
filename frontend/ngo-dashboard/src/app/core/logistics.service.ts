@@ -56,4 +56,16 @@ export class LogisticsService {
       return [];
     }
   }
+
+  list(status?: string, page = 0, size = 50): Observable<{ content: Logistics[]; totalElements: number }> {
+    const params: Record<string, string> = {
+      page: String(page),
+      size: String(size),
+      sort: 'updatedAt,desc',
+    };
+    if (status) {
+      params['status'] = status;
+    }
+    return this.http.get<{ content: Logistics[]; totalElements: number }>(this.baseUrl, { params });
+  }
 }

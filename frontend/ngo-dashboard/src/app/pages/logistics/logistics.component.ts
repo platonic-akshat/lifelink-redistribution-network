@@ -1,8 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
 import { LogisticsService } from '../../core/logistics.service';
 import { Logistics } from '../../models/logistics.model';
 
@@ -28,29 +26,18 @@ export class LogisticsComponent implements OnInit {
   }
 
   fetchAll(): void {
-    const matchIds = this.logisticsService.getApprovedMatchIds();
-
-    if (matchIds.length === 0) {
-      this.records = [];
-      return;
-    }
-
     this.isLoading = true;
     this.errorMessage = null;
 
-    const requests = matchIds.map((matchId) =>
-      this.logisticsService.get(matchId).pipe(catchError(() => of(null)))
-    );
-
-    forkJoin(requests).subscribe({
-      next: (results) => {
-        this.records = results.filter((r): r is Logistics => r !== null);
+    this.logisticsService.list().subscribe({
+      next: (page) => {
+        this.records = page.content ?? [];
         this.isLoading = false;
       },
       error: () => {
         this.errorMessage = 'Failed to load logistics records.';
         this.isLoading = false;
-      }
+      },
     });
   }
 

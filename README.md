@@ -7,12 +7,14 @@ before it expires or is wasted.
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full system design (services,
 Kafka topics, data model, deployment topology).
 
+**Step-by-step local run:** [RUN_LOCALLY.md](./RUN_LOCALLY.md)
+
 ## Stack
 
 - **Backend**: Java 21, Spring Boot 3, Spring Cloud Gateway, Kafka + Kafka
   Streams, Postgres + PostGIS, Flyway, Maven multi-module
-- **Frontend**: React + TypeScript + Vite (`surplus-portal`), Angular
-  (`ngo-dashboard`)
+- **Frontend**: React + TypeScript + Vite (`surplus-portal` — provider **and** NGO/coordinator workflows), Angular
+  (`ngo-dashboard`, legacy duplicate of NGO flows; prefer React for new work)
 - **Infra**: Docker Compose (Kafka KRaft, Postgres, Redis, Kafka-UI) for local
   dev; Kubernetes manifests sketch in `infra/k8s` for production
 
@@ -45,7 +47,33 @@ docker compose up -d
 
 This brings up Kafka (localhost:9092), Kafka-UI (http://localhost:8090),
 Postgres (localhost:5432, databases `surplus_db`/`need_db`/`coordination_db`),
-and Redis (localhost:6379).
+Redis (localhost:6379), and **Keycloak** (http://localhost:8180, admin/admin).
+
+Dev users (realm `lifelink`):
+
+| User | Password | Role | Notes |
+|------|----------|------|-------|
+| `provider1` | `provider1` | PROVIDER | org `11111111-1111-1111-1111-111111111111` |
+| `ngo1` | `ngo1` | NGO | org `22222222-2222-2222-2222-222222222222`; posts/cancels needs |
+| `coordinator1` | `coordinator1` | COORDINATOR | same NGO org; approves matches & logistics (`decidedBy` = JWT `sub`) |
+| `admin1` | `admin1` | ADMIN | org verification + outbox requeue + DLT replay via `/api/admin/**` |
+
+The React app obtains tokens from Keycloak by default; set `VITE_LEGACY_LOGIN=true`
+to use the old gateway JWT stub (`lifelink.auth.legacy-login-enabled=true`).
+
+**Messaging reliability:** surplus, need, and coordination services write Kafka
+events through a **transactional outbox** (`common-outbox`, table `outbox_event`,
+scheduled relay). Consumer failures on surplus/need lifecycle listeners route to
+`*.DLT` topics; admins replay with `POST /api/admin/dlt/replay`. Failed outbox
+rows can be requeued with `POST /api/admin/outbox/{eventId}/requeue`.
+
+**Organization verification:** coordination stores `organization.verification_status`.
+Surplus/need create calls `GET /api/organizations/{id}/verification` (disable with
+`lifelink.verification.enforce=false`). Admins patch status via
+`PATCH /api/admin/organizations/{id}/verification`.
+
+**Failed delivery:** marking logistics `FAILED` publishes a reopen event *and*
+deletes `allocated_surplus` rows so the same surplus can match again.
 
 **Without Docker (e.g. locked-down/work laptop with no Docker Desktop access)
 — plain Homebrew formulae, no privileged install step:**
@@ -104,7 +132,7 @@ cd backend/api-gateway           && mvn spring-boot:run   # :8080  <- single ent
 
 ```bash
 cd frontend/surplus-portal && npm install && npm run dev   # http://localhost:5173
-cd frontend/ngo-dashboard  && npm install && npm start     # http://localhost:4200
+cd frontend/ngo-dashboard  && npm install && npm start     # http://localhost:4200 (optional; NGO flows also in React)
 ```
 
 Both frontends talk to the API through `api-gateway` on `http://localhost:8080`.
@@ -150,13 +178,16 @@ gold-plated here — see ARCHITECTURE.md for the reasoning behind each:
   username/password; no user directory. Swap for Keycloak/Auth0 (§4.6, §8).
 - **Geohash neighbor fan-out** — matching-service joins within one geohash
   cell (~5km); an item just across a cell boundary can be missed (§4.3, §9).
+  **Update (2026-10):** matching-service now fans each surplus/need event into
+  neighboring geohash buckets before joining, reducing boundary misses.
 - **Observability** — Prometheus/Grafana/tracing are documented, not wired.
-- **Surplus/need status sync on decision** — `match.decisions` is documented
-  as consumed by surplus-service/need-service (§5) to flip a claimed item to
-  `CLAIMED`/`MATCHED`, but that consumer isn't implemented yet; today only
-  coordination-service's own `MatchProposal`/`Logistics` records reflect the
-  decision. A real approval currently leaves the original surplus/need row
-  showing `POSTED` even after it's been matched and delivered.
+- **Surplus/need status sync on decision** — **Update (2026-10):**
+  `surplus-service` and `need-service` now consume `match.decisions` and
+  `logistics.events` (with idempotent `inbound_event` tracking) to move surplus
+  through CLAIMED → COMPLETED and needs through MATCHED → FULFILLED. Logistics
+  listing is available at `GET /api/logistics` (no localStorage required).
+- **Stable match identity** — **Update (2026-10):** `MatchIds.deterministicMatchId`
+  prevents duplicate PENDING rows for the same need/surplus pair.
 
 Verified end-to-end on 2026-09-10 by running the full stack (Kafka + Postgres
 via Homebrew, all 6 services, both frontends) and completing the whole happy

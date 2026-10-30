@@ -1,5 +1,6 @@
 package com.lifelink.matching.topology;
 
+import com.lifelink.events.MatchIds;
 import com.lifelink.events.geo.GeoUtil;
 import com.lifelink.events.model.MatchProposedEvent;
 import com.lifelink.events.model.NeedEvent;
@@ -51,11 +52,12 @@ public final class MatchScorer {
                 + PROXIMITY_WEIGHT * (1.0 / (distanceKm + 0.1))
                 + EXPIRY_WEIGHT * (1.0 / (hoursToExpiry + 1.0));
 
+        List<UUID> surplusIds = List.of(surplus.surplusId());
         return new MatchProposedEvent(
                 UUID.randomUUID(),
-                UUID.randomUUID(),
+                MatchIds.deterministicMatchId(need.needId(), surplusIds),
                 need.needId(),
-                List.of(surplus.surplusId()),
+                surplusIds,
                 score,
                 distanceKm,
                 hoursToExpiry,

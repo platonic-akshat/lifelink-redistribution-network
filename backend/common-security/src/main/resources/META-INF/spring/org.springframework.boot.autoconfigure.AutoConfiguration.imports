@@ -1,0 +1,2 @@
+com.lifelink.security.LifelinkResourceServerConfig
+com.lifelink.security.LifelinkVerificationClientAutoConfiguration

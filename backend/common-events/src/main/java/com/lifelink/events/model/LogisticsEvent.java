@@ -1,6 +1,7 @@
 package com.lifelink.events.model;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -10,6 +11,8 @@ import java.util.UUID;
 public record LogisticsEvent(
         UUID eventId,
         UUID matchId,
+        UUID needId,
+        List<UUID> surplusIds,
         LogisticsStatus status,
         String notes,
         Instant occurredAt

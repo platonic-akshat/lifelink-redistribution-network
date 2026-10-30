@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { listSurplusForProvider, withdrawSurplus } from "../api/surplus";
-import type { Surplus, SurplusStatus } from "../types";
+import type { Surplus, SurplusCategory, SurplusStatus } from "../types";
 import { formatRelativeExpiry } from "../utils/time";
 import { ApiError } from "../api/client";
+import EmptyState from "../components/EmptyState";
+import LoadingBlock from "../components/LoadingBlock";
+import PageHeader from "../components/PageHeader";
 
 const STATUS_CLASS: Record<SurplusStatus, string> = {
   POSTED: "badge badge-green",
@@ -12,6 +15,12 @@ const STATUS_CLASS: Record<SurplusStatus, string> = {
   CLAIMED: "badge badge-blue",
   EXPIRED: "badge badge-gray",
   COMPLETED: "badge badge-gray",
+};
+
+const CATEGORY_ICON: Record<SurplusCategory, string> = {
+  MEDICINE: "💊",
+  BLOOD: "🩸",
+  FOOD: "🍽",
 };
 
 export default function PostingsPage() {
@@ -63,11 +72,10 @@ export default function PostingsPage() {
   if (!providerName) {
     return (
       <div className="page page-narrow">
-        <h1>Welcome to LifeLink</h1>
-        <p className="muted">
-          Before you post surplus, tell us who's posting. This is stored on
-          this device and sent with every posting you create.
-        </p>
+        <PageHeader
+          title="Welcome to LifeLink"
+          lead="Tell us your organization name once — we store it on this device and send it with every surplus you post."
+        />
         <form className="card" onSubmit={handleSaveName}>
           <label className="field">
             <span>Organization / provider name</span>
@@ -87,35 +95,43 @@ export default function PostingsPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>Your Postings</h1>
-          <p className="muted">Posting as {providerName}</p>
-        </div>
-        <Link className="button-link" to="/postings/new">
-          + New Posting
-        </Link>
-      </div>
+      <PageHeader
+        title="Your surplus"
+        lead={`Posting as ${providerName}. Withdraw listings you no longer want matched.`}
+        actions={
+          <Link className="button-link" to="/postings/new">
+            + New posting
+          </Link>
+        }
+      />
 
       {error && <p className="error">{error}</p>}
 
       {loading ? (
-        <p className="muted">Loading...</p>
+        <LoadingBlock label="Loading your postings…" />
       ) : postings.length === 0 ? (
-        <p className="muted">No postings yet. Create your first one.</p>
+        <EmptyState
+          icon="📦"
+          title="No surplus posted yet"
+          description="Create a listing so matching can pair it with nearby needs before expiry."
+          actionLabel="Create your first posting"
+          actionTo="/postings/new"
+        />
       ) : (
         <div className="card-grid">
           {postings.map((posting) => (
-            <div className="card" key={posting.id}>
+            <div className="card card-interactive" key={posting.id}>
               <div className="card-top">
-                <span className="category">{posting.category}</span>
+                <span className="category-pill">
+                  {CATEGORY_ICON[posting.category]} {posting.category}
+                </span>
                 <span className={STATUS_CLASS[posting.status]}>
                   {posting.status.replace("_", " ")}
                 </span>
               </div>
               <h3>{posting.subType}</h3>
               <p>
-                {posting.quantity} {posting.unit}
+                <strong>{posting.quantity}</strong> {posting.unit}
               </p>
               <p className="muted">{formatRelativeExpiry(posting.expiresAt)}</p>
               <button
@@ -123,7 +139,7 @@ export default function PostingsPage() {
                 onClick={() => handleWithdraw(posting.id)}
                 disabled={withdrawingId === posting.id}
               >
-                {withdrawingId === posting.id ? "Withdrawing..." : "Withdraw"}
+                {withdrawingId === posting.id ? "Withdrawing…" : "Withdraw"}
               </button>
             </div>
           ))}

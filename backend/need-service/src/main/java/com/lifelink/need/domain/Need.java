@@ -61,6 +61,10 @@ public class Need {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     protected Need() {
         // JPA
     }

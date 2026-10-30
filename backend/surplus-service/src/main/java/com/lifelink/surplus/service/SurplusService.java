@@ -93,4 +93,47 @@ public class SurplusService {
         eventPublisher.publish(surplus);
         return surplus;
     }
+
+    @Transactional
+    public void applyMatchApproved(UUID surplusId) {
+        Surplus surplus = getOrThrow(surplusId);
+        if (surplus.getStatus() == SurplusStatus.CLAIMED
+                || surplus.getStatus() == SurplusStatus.COMPLETED) {
+            return;
+        }
+        if (surplus.getStatus() != SurplusStatus.POSTED
+                && surplus.getStatus() != SurplusStatus.EXPIRING_SOON) {
+            throw new IllegalStateException("Surplus " + surplusId + " is not available for matching");
+        }
+        surplus.setStatus(SurplusStatus.CLAIMED);
+        surplus.setUpdatedAt(Instant.now());
+        eventPublisher.publish(surplus);
+    }
+
+    @Transactional
+    public void applyLogisticsDelivered(UUID surplusId) {
+        Surplus surplus = getOrThrow(surplusId);
+        if (surplus.getStatus() == SurplusStatus.COMPLETED) {
+            return;
+        }
+        if (surplus.getStatus() != SurplusStatus.CLAIMED) {
+            throw new IllegalStateException("Surplus " + surplusId + " must be claimed before delivery");
+        }
+        surplus.setStatus(SurplusStatus.COMPLETED);
+        surplus.setUpdatedAt(Instant.now());
+        eventPublisher.publish(surplus);
+    }
+
+    @Transactional
+    public void applyLogisticsFailed(UUID surplusId) {
+        Surplus surplus = getOrThrow(surplusId);
+        if (surplus.getStatus() == SurplusStatus.POSTED) {
+            return;
+        }
+        if (surplus.getStatus() == SurplusStatus.CLAIMED) {
+            surplus.setStatus(SurplusStatus.POSTED);
+            surplus.setUpdatedAt(Instant.now());
+            eventPublisher.publish(surplus);
+        }
+    }
 }

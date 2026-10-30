@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${LIFELINK_OAUTH2_ISSUER_URI:http://localhost:8180/realms/lifelink}
   cloud:
     gateway:
       routes:
@@ -23,6 +28,14 @@ spring:
           uri: http://localhost:8083
           predicates:
             - Path=/api/logistics/**
+        - id: coordination-organizations
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/organizations/**
+        - id: coordination-admin
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/admin/**
 
 management:
   endpoints:
@@ -41,6 +54,10 @@ management:
 # default to production.
 # ---------------------------------------------------------------------------
 lifelink:
+  auth:
+    legacy-login-enabled: false
+    keycloak-token-url: ${LIFELINK_KEYCLOAK_TOKEN_URL:http://localhost:8180/realms/lifelink/protocol/openid-connect/token}
+    keycloak-client-id: ${LIFELINK_KEYCLOAK_CLIENT_ID:lifelink-web}
   jwt:
     secret: "dev-only-insecure-signing-secret-do-not-use-in-production-change-me-1234567890"
     expiry-seconds: 86400
